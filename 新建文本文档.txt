@@ -1,0 +1,1337 @@
+识别指令	报文结构（上位机任务下发）
+识别指令	参数	中文名称	参数类型	值	是否必填	备注
+识别指令	eid	唯一标识	String	VISUAL	是	唯一标识
+识别指令	dev	设备	String	DC1	是	DC1 DC:深度相机 
+识别指令	type	请求类型	String		是	详见底栏右侧表格 浅粉色为上位机下发内容
+识别指令	taskNum	任务编号	String	type +年月日+6位流水号	是
+识别指令	task	任务数组	JSON		是	详见底栏右侧表格 浅粉色为上位机下发内容
+识别指令	sendTime	请求时间	String	2023/4/7 10:05	是	格式为:"yyyy-MM-dd HH:mm:ss"
+识别指令	返回数据
+识别指令	提交成功返回		"{
+    "result": true,
+    "taskNum": "selfCheck20221111123456",
+    "time": "2022-11-11 09:32:02"
+}"			"result:接收状态true/false
+time:接收时间"
+识别指令	提交失败返回		"{
+    "result": false,
+    "taskNum": "selfCheck20221111123456",
+    "code": 1004
+}"			通用异常代码
+识别指令
+识别指令	报文结构（视觉任务反馈）
+识别指令	参数	中文名称	参数类型	值	是否必填	备注
+识别指令	eid	唯一标识	String	VISUAL	是	唯一标识
+识别指令	dev	设备	String	DC1	是	DC1 DC:深度相机 
+识别指令	type	请求类型	String		是	详见底栏右侧表格 浅橙色为视觉反馈内容
+识别指令	taskNum	任务编号	String	type +年月日+6位流水号	是
+识别指令	data	返回数据	JSON		是	详见底栏右侧表格 浅橙色为视觉反馈内容
+识别指令	sendTime	请求时间	String	2023/4/7 10:05	是	格式为:"yyyy-MM-dd HH:mm:ss"
+识别指令	返回数据
+识别指令	提交成功返回		"{
+    "result": true,
+    "taskNum": "selfCheck20221111123456",
+    "time": "2022-11-11 09:32:02"
+}"			"result:接收状态true/false
+time:接收时间"
+识别指令	提交失败返回		"{
+    "result": false,
+    "taskNum": "selfCheck20221111123456",
+    "code": 1004
+}"			通用异常代码
+识别指令
+识别指令	通用异常代码	code	异常说明		备注
+识别指令		1001	相机识别超时
+识别指令		9001	相机正在执行上一个任务
+识别指令		9002	相机离线
+识别指令		9003	无对应相机设备		比如下发DC2 但是只有DC1
+二维码识别		中文名称	参数类型	值	是否必填	备注	参数
+二维码识别		请求类型	String	qrCode	是	二维码识别	type
+二维码识别		任务数组	JSON	"{
+ "qrID"：1，
+}"	是	"{ 
+ "qrID"：1，二维码ID
+}"	task
+二维码识别		请求类型	String	qrCodeFeedback	是	二维码识别反馈	type
+二维码识别		任务数组	JSON	"{ 
+"result":"pass",
+"point":[id,x,y,z,px,py],
+"code"：0
+}"	是	"{
+"result":"pass",
+"point":二维码的坐标和ID
+"code"：0  
+   1001：识别超时
+   1002：二维码错误
+}"	data
+二维码识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "qrCode",
+    "taskNum": "qrCode20240305000001",
+    "task": {
+         "qrID":1
+    },
+    "sendTime": "2024-03-05 16:46:55"
+}"					下发指令
+二维码识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "qrCodeFeedback",
+    "taskNum": "qrCodeFeedback20240305000001",
+    "data": {
+         "result":"pass",
+         "point":[1,0,0,500,640,360],
+         "code":0
+    },
+    "sendTime": "2024-03-05 17:37:20"
+}"					上报指令
+状态上报		中文名称	参数类型	值	是否必填	备注		参数
+状态上报		唯一标识	String	VISUAL	是	唯一标识		eid
+状态上报		设备	String	DC1	是	DC1 DC:深度相机 		dev
+状态上报		请求类型	String	StatusReport	是	状态上报		type
+状态上报		任务编号	String	type +年月日+6位流水号	是			taskNum
+状态上报		状态数据	JSON	"{ 
+"code"：1，
+}"	是	"{
+"code"：异常代码，0正常，>0异常
+}"		data
+状态上报		请求时间	String	2023/4/7 10:05	是	格式为:"yyyy-MM-dd HH:mm:ss"		sendTime
+状态上报		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "StatusReport",
+    "taskNum": "type20251209123456",
+    "data": {
+        "code": 0
+    },
+    "sendTime": "2024-03-05 16:33:25"
+}"						上报指令
+心跳		中文名称	参数类型	值	是否必填	备注			参数
+心跳		唯一标识	String	VISUAL	是	唯一标识			eid
+心跳		设备	String	DC1	是	DC1  DC:深度相机			dev
+心跳		请求类型	String	heartbeat	是	心跳			type
+心跳		请求时间	String	2023/4/7 10:05	是	格式为:"yyyy-MM-dd HH:mm:ss"			sendTime
+心跳		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "heartbeat",
+    "sendTime": "2024-03-05 16:33:25"
+}"							上报指令
+纸箱定位		中文名称	参数类型	值	是否必填	备注	参数
+纸箱定位		请求类型	String	boxLocate	是	纸箱定位	type
+纸箱定位		任务数组	JSON	{}	是	无需额外参数	task
+纸箱定位		请求类型	String	boxLocateFeedback	是	纸箱定位反馈	type
+纸箱定位		任务数组	JSON	"{
+    "result": "pass",
+    "point": [
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py"
+        ]
+    ],
+    "code": 0
+}"	是	point 为 4 个角点，单点格式为 [x,y,z,px,py]；1001：未检测到纸箱轮廓	data
+纸箱定位		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "boxLocate",
+    "taskNum": "boxLocate20260519000001",
+    "task": {},
+    "sendTime": "2026-05-19 19:30:00"
+}"					下发指令
+纸箱定位		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "boxLocateFeedback",
+    "taskNum": "boxLocate20260519000001",
+    "data": {
+        "result": "pass",
+        "point": [
+            [
+                -210.5,
+                -95.2,
+                742.0,
+                247,
+                240
+            ],
+            [
+                214.6,
+                -95.4,
+                741.8,
+                988,
+                235
+            ],
+            [
+                217.8,
+                193.1,
+                744.0,
+                991,
+                719
+            ],
+            [
+                -208.2,
+                196.4,
+                744.3,
+                250,
+                724
+            ]
+        ],
+        "code": 0
+    },
+    "sendTime": "2026-05-19 19:30:02"
+}"					上报指令
+纸箱中缝定位		中文名称	参数类型	值	是否必填	备注				参数
+纸箱中缝定位		请求类型	String	boxCenterSeamLocate	是	纸箱中缝定位				type
+纸箱中缝定位		任务数组	JSON	{}	是	无需额外参数				task
+纸箱中缝定位		请求类型	String	boxCenterSeamLocateFeedback	是	纸箱中缝定位反馈				type
+纸箱中缝定位		任务数组	JSON	"{
+    "result": "pass",
+    "point": [
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py"
+        ]
+    ],
+    "code": 0
+}"	是	point 为中缝上端点和下端点；1001：未检测到纸箱中缝				data
+纸箱中缝定位		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "boxCenterSeamLocate",
+    "taskNum": "boxCenterSeamLocate20260519000001",
+    "task": {},
+    "sendTime": "2026-05-19 19:31:00"
+}"								下发指令
+纸箱中缝定位		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "boxCenterSeamLocateFeedback",
+    "taskNum": "boxCenterSeamLocate20260519000001",
+    "data": {
+        "result": "pass",
+        "point": [
+            [
+                1.2,
+                -184.6,
+                458.0,
+                646,
+                40
+            ],
+            [
+                1.8,
+                183.3,
+                456.0,
+                642,
+                679
+            ]
+        ],
+        "code": 0
+    },
+    "sendTime": "2026-05-19 19:31:02"
+}"								上报指令
+纸箱左切缝识别		中文名称	参数类型	值	是否必填	备注					参数
+纸箱左切缝识别		请求类型	String	boxLeftCutSeam	是	纸箱左切缝识别					type
+纸箱左切缝识别		任务数组	JSON	"{
+    "boxLR": 0
+}"	是	boxLR=0 表示左切缝					task
+纸箱左切缝识别		请求类型	String	boxLeftCutSeamFeedback	是	纸箱左切缝识别反馈					type
+纸箱左切缝识别		任务数组	JSON	"{
+    "result": "pass",
+    "point": [
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ]
+    ],
+    "code": 0
+}"	是	point 为沿切缝均匀采样的 20 个点，单点格式为 [x,y,z,px,py,angle]；1001：未检测到纸箱切缝					data
+纸箱左切缝识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "boxLeftCutSeam",
+    "taskNum": "boxLeftCutSeam20260519000001",
+    "task": {
+        "boxLR": 0
+    },
+    "sendTime": "2026-05-19 19:32:00"
+}"									下发指令
+纸箱左切缝识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "boxLeftCutSeamFeedback",
+    "taskNum": "boxLeftCutSeam20260519000001",
+    "data": {
+        "result": "pass",
+        "point": [
+            [
+                -171.2,
+                -2.4,
+                455.0,
+                315,
+                356,
+                1.0
+            ],
+            [
+                -162.2,
+                -2.2,
+                455.0,
+                366,
+                357,
+                1.0
+            ],
+            [
+                -153.1,
+                -2.0,
+                455.0,
+                417,
+                358,
+                1.0
+            ]
+        ],
+        "code": 0
+    },
+    "sendTime": "2026-05-19 19:32:02"
+}"									上报指令
+纸箱右切缝识别		中文名称	参数类型	值	是否必填	备注						参数
+纸箱右切缝识别		请求类型	String	boxRightCutSeam	是	纸箱右切缝识别						type
+纸箱右切缝识别		任务数组	JSON	"{
+    "boxLR": 1
+}"	是	boxLR=1 表示右切缝						task
+纸箱右切缝识别		请求类型	String	boxRightCutSeamFeedback	是	纸箱右切缝识别反馈						type
+纸箱右切缝识别		任务数组	JSON	"{
+    "result": "pass",
+    "point": [
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ],
+        [
+            "x",
+            "y",
+            "z",
+            "px",
+            "py",
+            "angle"
+        ]
+    ],
+    "code": 0
+}"	是	point 为沿切缝均匀采样的 20 个点，单点格式为 [x,y,z,px,py,angle]；1001：未检测到纸箱切缝						data
+纸箱右切缝识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "boxRightCutSeam",
+    "taskNum": "boxRightCutSeam20260519000001",
+    "task": {
+        "boxLR": 1
+    },
+    "sendTime": "2026-05-19 19:33:00"
+}"										下发指令
+纸箱右切缝识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "boxRightCutSeamFeedback",
+    "taskNum": "boxRightCutSeam20260519000001",
+    "data": {
+        "result": "pass",
+        "point": [
+            [
+                -307.9,
+                -5.5,
+                457.0,
+                0,
+                355,
+                1.0
+            ],
+            [
+                -298.9,
+                -5.3,
+                457.0,
+                67,
+                356,
+                1.0
+            ],
+            [
+                -289.8,
+                -5.1,
+                457.0,
+                134,
+                357,
+                1.0
+            ]
+        ],
+        "code": 0
+    },
+    "sendTime": "2026-05-19 19:33:02"
+}"										上报指令
+纸箱翻页识别		中文名称	参数类型	值	是否必填	备注							参数
+纸箱翻页识别		请求类型	String	boxFlipPage	是	纸箱翻页识别							type
+纸箱翻页识别		任务数组	JSON	"{
+    "boxLength": 620,
+    "boxWidth": 400,
+    "flipDirection": 1,
+    "sortRule": 1
+}"	是	boxLength/boxWidth 单位 mm；flipDirection：0 上下页片优先，1 左右页片优先；sortRule 为排布规则							task
+纸箱翻页识别		请求类型	String	boxFlipPageFeedback	是	纸箱翻页识别反馈							type
+纸箱翻页识别		任务数组	JSON	"{
+    "result": "pass",
+    "point": {
+        "sheetsInPlace": {
+            "top": 1,
+            "bottom": 1,
+            "left": 0,
+            "right": 0,
+            "board": 0
+        },
+        "forcedPageState": 0,
+        "sortRule": 1,
+        "flipDirection": 1,
+        "top": [
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ],
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ],
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ]
+        ],
+        "bottom": [
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ],
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ],
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ]
+        ],
+        "left": [
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ],
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ],
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ]
+        ],
+        "right": [
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ],
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ],
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ]
+        ]
+    },
+    "code": 0
+}"	是	"point 为结构化 JSON：包含页片在位状态、forcedPageState、sortRule
+flipDirection 0 = 上下页片优先 1 = 左右页片优先
+ 和四个方向各 3 个点；1001：未检测到翻页状态"							data
+纸箱翻页识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "boxFlipPage",
+    "taskNum": "boxFlipPage20260519000001",
+    "task": {
+        "boxLength": 620,
+        "boxWidth": 400,
+        "flipDirection": 1,
+        "sortRule": 1
+    },
+    "sendTime": "2026-05-19 19:34:00"
+}"											下发指令
+纸箱翻页识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "boxFlipPageFeedback",
+    "taskNum": "boxFlipPage20260519000001",
+    "data": {
+        "result": "pass",
+        "point": {
+            "sheetsInPlace": {
+                "top": 0,
+                "bottom": 0,
+                "left": 1,
+                "right": 1,
+                "board": 1
+            },
+            "forcedPageState": 0,
+            "sortRule": 1,
+            "flipDirection": 1,
+            "top": [
+                [
+                    -95.0,
+                    -160.0,
+                    822.0,
+                    640,
+                    160
+                ],
+                [
+                    -12.0,
+                    -160.0,
+                    822.0,
+                    710,
+                    160
+                ],
+                [
+                    -52.0,
+                    -160.0,
+                    822.0,
+                    675,
+                    160
+                ]
+            ],
+            "bottom": [
+                [
+                    -95.0,
+                    155.0,
+                    818.0,
+                    640,
+                    560
+                ],
+                [
+                    -12.0,
+                    155.0,
+                    818.0,
+                    710,
+                    560
+                ],
+                [
+                    -52.0,
+                    155.0,
+                    818.0,
+                    675,
+                    560
+                ]
+            ],
+            "left": [
+                [
+                    -210.0,
+                    -40.0,
+                    790.0,
+                    430,
+                    300
+                ],
+                [
+                    -210.0,
+                    45.0,
+                    790.0,
+                    430,
+                    420
+                ],
+                [
+                    -210.0,
+                    2.0,
+                    790.0,
+                    430,
+                    360
+                ]
+            ],
+            "right": [
+                [
+                    205.0,
+                    -40.0,
+                    793.0,
+                    860,
+                    300
+                ],
+                [
+                    205.0,
+                    45.0,
+                    793.0,
+                    860,
+                    420
+                ],
+                [
+                    205.0,
+                    2.0,
+                    793.0,
+                    860,
+                    360
+                ]
+            ]
+        },
+        "code": 0
+    },
+    "sendTime": "2026-05-19 19:34:02"
+}"											上报指令
+纸箱抓取点识别		中文名称	参数类型	值	是否必填	备注								参数
+纸箱抓取点识别		请求类型	String	boxGraspPoint	是	纸箱抓取点识别								type
+纸箱抓取点识别		任务数组	JSON	"{
+    "boxLR": 0
+}"	是	boxLR 可选，当前默认 0 使用左侧抓取逻辑								task
+纸箱抓取点识别		请求类型	String	boxGraspPointFeedback	是	纸箱抓取点识别反馈								type
+纸箱抓取点识别		任务数组	JSON	"{
+    "result": "pass",
+    "point": [
+        "x",
+        "y",
+        "z",
+        "px",
+        "py",
+        "angle"
+    ],
+    "code": 0
+}"	是	point 为单个抓取点，格式 [x,y,z,px,py,angle]；1001：未检测到抓取点								data
+纸箱抓取点识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "boxGraspPoint",
+    "taskNum": "boxGraspPoint20260519000001",
+    "task": {
+        "boxLR": 0
+    },
+    "sendTime": "2026-05-19 19:35:00"
+}"												下发指令
+纸箱抓取点识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "boxGraspPointFeedback",
+    "taskNum": "boxGraspPoint20260519000001",
+    "data": {
+        "result": "pass",
+        "point": [
+            -182.4,
+            138.6,
+            479.0,
+            434,
+            609,
+            -4.0
+        ],
+        "code": 0
+    },
+    "sendTime": "2026-05-19 19:35:02"
+}"												上报指令
+全局纱锭识别		中文名称	参数类型	值	是否必填	备注	参数
+全局纱锭识别		请求类型	String	globalYarnSpindle	是	全局纱锭识别	type
+全局纱锭识别		任务数组	JSON	"{
+    "diameter": 200,
+    "innerD": 80,
+    "spindlesCnt": 6
+}"	是	diameter 为纱锭外径 mm，innerD 为内孔直径 mm，spindlesCnt 为任务期望纱锭数量	task
+全局纱锭识别		请求类型	String	globalYarnSpindleFeedback	是	全局纱锭识别反馈	type
+全局纱锭识别		任务数组	JSON	"{
+    "result": "pass",
+    "point": {
+        "diameter": 200,
+        "innerD": 80,
+        "spindlesCnt": 6,
+        "points": [
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ],
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ],
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ],
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ],
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ],
+            [
+                "x",
+                "y",
+                "z",
+                "px",
+                "py"
+            ]
+        ]
+    },
+    "code": 0
+}"	是	point 为结构化 JSON：spindlesCnt 表示识别到的纱锭数量，points 为纱锭中心点列表；1001：未检测到全局纱锭	data
+全局纱锭识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "globalYarnSpindle",
+    "taskNum": "globalYarnSpindle20260520000001",
+    "task": {
+        "diameter": 200,
+        "innerD": 80,
+        "spindlesCnt": 6
+    },
+    "sendTime": "2026-05-20 09:30:00"
+}"					下发指令
+全局纱锭识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "globalYarnSpindleFeedback",
+    "taskNum": "globalYarnSpindle20260520000001",
+    "data": {
+        "result": "pass",
+        "point": {
+            "diameter": 200,
+            "innerD": 80,
+            "spindlesCnt": 6,
+            "points": [
+                [
+                    -112.0,
+                    -92.4,
+                    826.0,
+                    443,
+                    248
+                ],
+                [
+                    83.6,
+                    -92.8,
+                    828.0,
+                    666,
+                    292
+                ],
+                [
+                    271.5,
+                    -95.6,
+                    828.0,
+                    880,
+                    254
+                ],
+                [
+                    -106.2,
+                    116.3,
+                    830.0,
+                    453,
+                    467
+                ],
+                [
+                    81.9,
+                    151.5,
+                    831.0,
+                    666,
+                    509
+                ],
+                [
+                    276.0,
+                    128.7,
+                    830.0,
+                    885,
+                    483
+                ]
+            ]
+        },
+        "code": 0
+    },
+    "sendTime": "2026-05-20 09:30:02"
+}"					上报指令
+单个纱锭识别		中文名称	参数类型	值	是否必填	备注	参数
+单个纱锭识别		请求类型	String	singleYarnSpindle	是	单个纱锭识别	type
+单个纱锭识别		任务数组	JSON	"{
+    "diameter": 200,
+    "innerD": 80
+}"	是	diameter 为纱锭外径 mm，innerD 为内孔直径 mm	task
+单个纱锭识别		请求类型	String	singleYarnSpindleFeedback	是	单个纱锭识别反馈	type
+单个纱锭识别		任务数组	JSON	"{
+    "result": "pass",
+    "point": [
+        "x",
+        "y",
+        "z",
+        "px",
+        "py"
+    ],
+    "code": 0
+}"	是	point 为单个纱锭中心点，格式 [x,y,z,px,py]；1001：未检测到单个纱锭	data
+单个纱锭识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "singleYarnSpindle",
+    "taskNum": "singleYarnSpindle20260520000001",
+    "task": {
+        "diameter": 200,
+        "innerD": 80
+    },
+    "sendTime": "2026-05-20 09:31:00"
+}"					下发指令
+单个纱锭识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "singleYarnSpindleFeedback",
+    "taskNum": "singleYarnSpindle20260520000001",
+    "data": {
+        "result": "pass",
+        "point": [
+            -1.3,
+            12.6,
+            471.0,
+            639,
+            386
+        ],
+        "code": 0
+    },
+    "sendTime": "2026-05-20 09:31:02"
+}"					上报指令
+高度识别		中文名称	参数类型	值	是否必填	备注	参数
+高度识别		请求类型	String	height	是	高度识别	type
+高度识别		任务数组	JSON	"{
+    "areaLength": 1000,
+    "areaWidth": 720
+}"	是	areaLength 为识别区域 x 方向长度 mm，areaWidth 为识别区域 y 方向宽度 mm；识别时以相机主点投影区域为范围。	task
+高度识别		请求类型	String	heightFeedback	是	高度识别反馈	type
+高度识别		任务数组	JSON	"{
+    "result": "pass",
+    "point": {
+        "height": 820.0
+    },
+    "code": 0
+}"	是	point 为结构化 JSON：height 表示指定区域内有效深度升序后 5%-10% 分位区间的平均高度，单位 mm；1001：未检测到有效高度。	data
+高度识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "height",
+    "taskNum": "height20260521000001",
+    "task": {
+        "areaLength": 1000,
+        "areaWidth": 720
+    },
+    "sendTime": "2026-05-21 14:30:00"
+}"					下发指令
+高度识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "heightFeedback",
+    "taskNum": "height20260520000001",
+    "data": {
+        "result": "pass",
+        "point": {
+            "height": 820.0
+        },
+        "code": 0
+    },
+    "sendTime": "2026-05-20 14:30:02"
+}"					上报指令
+托盘识别		中文名称	参数类型	值	是否必填	备注	参数
+托盘识别		请求类型	String	pallet	是	托盘识别	type
+托盘识别		任务数组	JSON	{}	是	无需额外参数	task
+托盘识别		请求类型	String	palletFeedback	是	托盘识别反馈	type
+托盘识别		任务数组	JSON	"{
+    "result": "pass",
+    "point": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 1600.0,
+        "angle": 90.0,
+        "px": 640,
+        "py": 360
+    },
+    "code": 0
+}"	是	point 为结构化 JSON：x/y/z 为托盘中心空间坐标，angle 为托盘角度，px/py 为像素坐标；1001：未检测到托盘	data
+托盘识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "pallet",
+    "taskNum": "pallet20260520000001",
+    "task": {},
+    "sendTime": "2026-05-20 14:40:00"
+}"					下发指令
+托盘识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "palletFeedback",
+    "taskNum": "pallet20260520000001",
+    "data": {
+        "result": "pass",
+        "point": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 1600.0,
+            "angle": 90.0,
+            "px": 640,
+            "py": 360
+        },
+        "code": 0
+    },
+    "sendTime": "2026-05-20 14:40:02"
+}"					上报指令
+纱锭放置位置识别		中文名称	参数类型	值	是否必填	备注	参数
+纱锭放置位置识别		请求类型	String	yarnSpindlePlacement	是	纱锭放置位置识别	type
+纱锭放置位置识别		任务数组	JSON	"{
+    "diameter": 200,
+    "spindleHeight": 300,
+    "placementLR": 1
+}"	是	diameter 为放置位外径 mm，spindleHeight 为纱锭高度 mm；placementLR 为左右半区选择，0 表示左半区(centerX=25mm)，1 表示右半区(centerX=-25mm)；其余可放置区域参数为程序内部固定，当前 x=1000mm、y=700mm、centerY=0mm，识别平面 z≈1300mm。	task
+纱锭放置位置识别		请求类型	String	yarnSpindlePlacementFeedback	是	纱锭放置位置识别反馈	type
+纱锭放置位置识别		任务数组	JSON	"{
+    "result": "pass",
+    "point": {
+        "diameter": 200,
+        "spindleHeight": 400,
+        "spindlesCnt": 2,
+        "points": [
+            [
+                235.0,
+                353.0,
+                1300.0,
+                327,
+                152
+            ],
+            [
+                235.0,
+                118.0,
+                1300.0,
+                535,
+                152
+            ]
+        ]
+    },
+    "code": 0
+}"	是	point 为结构化 JSON：spindlesCnt 为空位数量，points 为空位点列表；points 直接返回对应的 x/y/z 与像素坐标 px/py，不做坐标变换；当前空位网格使用程序内部固定区域参数，并根据 placementLR 选择左右半区；1001：未检测到可用放置位。	data
+纱锭放置位置识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "yarnSpindlePlacement",
+    "taskNum": "yarnSpindlePlacement20260521000001",
+    "task": {
+        "diameter": 200,
+        "spindleHeight": 300,
+        "placementLR": 1
+    },
+    "sendTime": "2026-05-21 18:40:00"
+}"					下发指令
+纱锭放置位置识别		"{
+    "eid": "VISUAL",
+    "dev": "DC1",
+    "type": "yarnSpindlePlacementFeedback",
+    "taskNum": "yarnSpindlePlacement20260520000001",
+    "data": {
+        "result": "pass",
+        "point": {
+            "diameter": 200,
+            "spindleHeight": 400,
+            "spindlesCnt": 2,
+            "points": [
+                [
+                    235.0,
+                    353.0,
+                    1300.0,
+                    327,
+                    152
+                ],
+                [
+                    235.0,
+                    118.0,
+                    1300.0,
+                    535,
+                    152
+                ]
+            ]
+        },
+        "code": 0
+    },
+    "sendTime": "2026-05-20 14:50:02"
+}"					上报指令

@@ -1,0 +1,39 @@
+# 机器人信息
+Information:
+  hardwareversion: '1.0'
+  softwareversion: '1.0.0'
+
+  # RCS
+RcstcpServer:
+  host: 192.168.50.150
+  #host: 127.0.0.1
+  port: 5007
+  heartbeat: 3
+
+
+# 上位机
+tcpServer:
+  #host: 192.168.3.255
+  host: 127.0.0.1
+  port: 3001
+  heartbeat: 3
+
+# 机械手
+SCARAServer:
+  #host: 127.0.0.1
+  #匠心
+  host: 192.168.4.4
+  #host: 192.168.1.146
+  port: 9760
+  speed: 1000 #700
+  SLOW_SPEED: 600   # 搬运纸箱/纱锭的慢速
+DEBUG: 1
+CHECK_LIMIT: 1   # 1=检查限位, 0=跳过限位检查
+CUT_ORDER: "left_first"   # 切缝顺序: "right_first"=先右后左, "left_first"=先左后右
+
+
+
+
+
+
+
