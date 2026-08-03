@@ -342,7 +342,7 @@ def inverse_solution(euler_tar,vector_tar):
 
     JS2 = []
     print(f"JS关节: {JS}")
-    config.log.logger.info(f"JS关节: {JS}")
+    # config.log.logger.info(f"JS关节: {JS}")
     tolerance = 0  # 浮点精度容差
     for i in JS:
         flag = 0
@@ -370,10 +370,108 @@ def inverse_solution(euler_tar,vector_tar):
             JS2.append(i)
 
     if len(JS2) != 0:
+        config.log.logger.info(f"JS2关节: {JS2}")
         return True,JS2
     else:
-        print(f"JS失败: {JS}")
+        config.log.logger.warning(f"JS失败: {JS}")
         return False,JS
+
+def forward_solution(joints):
+    """正向运动学：关节角度 -> 末端位姿（世界坐标）
+    joints: [J1, J2, J3, J4, J5, J6] in degrees
+    returns: (vector_tar, euler_tar)
+    """
+    J1, J2, J3, J4, J5, J6 = joints
+
+    a = np.array([169.588, 0.498, 494.6])   # 基座偏移
+    b = np.array([0, 0, 730.870])            # 连杆2-3
+    c = np.array([826.042, 0, 99.301])       # 连杆3-4
+    d2 = np.array([0, 0, 164.00])            # 工具偏移
+
+    # 旋转矩阵
+    T1 = rotation_matrix({'u':0, 'v':0, 'w':J1})
+    T2 = rotation_matrix({'u':0, 'v':-J2, 'w':0})
+    T3 = rotation_matrix({'u':0, 'v':-J3, 'w':0})
+    T0 = rotation_matrix({'u':0, 'v':90, 'w':0})
+    # T456 = Rx(J4) @ Ry(-J5) @ Rx(J6)
+    T456 = np.dot(np.dot(rotation_matrix({'u':J4, 'v':0, 'w':0}),
+                         rotation_matrix({'u':0, 'v':-J5, 'w':0})),
+                  rotation_matrix({'u':J6, 'v':0, 'w':0}))
+
+    # 末端姿态 T_tar = T1 @ T2 @ T3 @ T456 @ T0
+    T_tar = np.dot(np.dot(np.dot(np.dot(T1, T2), T3), T456), T0)
+
+    # 提取欧拉角 (rotation_matrix = Rz(w) @ Ry(v) @ Rx(u))
+    u = math.atan2(T_tar[2,1], T_tar[2,2]) / math.pi * 180
+    v = math.atan2(-T_tar[2,0], math.sqrt(T_tar[2,1]**2 + T_tar[2,2]**2)) / math.pi * 180
+    w = math.atan2(T_tar[1,0], T_tar[0,0]) / math.pi * 180
+    euler_tar = {'u':u, 'v':v, 'w':w}
+
+    # 位置计算：腕部中心 = 基座偏移 + 连杆b + 连杆c
+    P1 = revolve({'u':0, 'v':0, 'w':J1}, a)
+    b_rot = revolve({'u':0, 'v':0, 'w':J1}, revolve({'u':0, 'v':-J2, 'w':0}, b))
+    c_rot = revolve({'u':0, 'v':0, 'w':J1}, revolve({'u':0, 'v':-J2, 'w':0}, revolve({'u':0, 'v':-J3, 'w':0}, c)))
+    P2 = P1 + b_rot + c_rot  # 腕部中心
+
+    # 末端位置 = 腕部中心 + 工具偏移
+    vector_tar = P2 + revolve(euler_tar, d2)
+
+    return vector_tar, euler_tar
+
+def get_dynamic_transition_poss0(default_poss0, max_diff=200):
+    """动态生成过渡关节位置poss[0]
+    将default_poss0（关节坐标）转换为世界坐标，与当前机械臂x比较
+    如果x轴差距超过max_diff，生成中间过渡点并转换为关节坐标
+    否则使用默认的固定关节位置
+    """
+    try:
+        # 从default_poss0提取关节角度
+        joints = [
+            default_poss0['x'] / 1000.0,
+            default_poss0['y'] / 1000.0,
+            default_poss0['z'] / 1000.0,
+            default_poss0['u'] / 1000.0,
+            default_poss0['v'] / 1000.0,
+            default_poss0['w'] / 1000.0
+        ]
+
+        # 正向运动学：关节角度 -> 世界坐标
+        target_vector, target_euler = forward_solution(joints)
+
+        current_x = config.currentPos['x']
+        target_x = target_vector[0]
+        x_diff = abs(current_x - target_x)
+
+        if x_diff > max_diff:
+            # x差距过大，生成中间过渡点
+            if current_x > target_x:
+                mid_x = current_x - max_diff
+            else:
+                mid_x = current_x + max_diff
+
+            mid_vector = np.array([mid_x, target_vector[1], target_vector[2]])
+            success, js = inverse_solution(target_euler, mid_vector)
+            if success and len(js) > 0:
+                joint = js[0]
+                config.log.logger.info(f"动态过渡点: 当前x={current_x:.1f}, 目标x={target_x:.1f}, 中间x={mid_x:.1f}")
+                return {
+                    'x': int(joint[0]*1000),
+                    'y': int(joint[1]*1000),
+                    'z': int(joint[2]*1000),
+                    'u': int(joint[3]*1000),
+                    'v': int(joint[4]*1000),
+                    'w': int(joint[5]*1000)
+                }
+            else:
+                config.log.logger.warning(f"动态过渡点逆解失败, 使用默认位置: x_diff={x_diff:.1f}")
+        else:
+            # x轴差距未超过max_diff，无需生成过渡点，记录当前x和目标x
+            config.log.logger.info(f"动态过渡点: 当前x={current_x:.1f}, 目标x={target_x:.1f}, x差={x_diff:.1f}未超{max_diff}mm, 使用默认位置")
+    except Exception as e:
+        config.log.logger.warning(f"get_dynamic_transition_poss0异常: {e}")
+
+    # 使用默认的固定关节位置
+    return default_poss0
 
 def CheckLimit(EndPos, action_name=""):
     # 如果配置中关闭了限位检查，直接返回True
@@ -554,7 +652,7 @@ def AdjustPosByLimit(EndPos, action_name="", adjust_axis='x'):
         new_pos = dict(EndPos)
         new_pos[adjust_axis] = int(safe_val * 1000)
 
-        info = f"限位回退: {action_name} {adjust_axis}轴 {EndPos[adjust_axis]/1000:.1f}mm → {safe_val*1000:.0f}mm"
+        info = f"限位回退: {action_name} {adjust_axis}轴 {EndPos[adjust_axis]/1000:.1f}mm → {safe_val:.1f}mm"
         config.log.logger.info(info)
         print(info)
 
@@ -615,7 +713,7 @@ def route_planning3(startPos,EndPos,hight):
     
     return poss,poss_arm
 
-def route_planning3_cw(startPos,EndPos,hight):
+def route_planning3_cw(startPos,EndPos,hight,lower_x=650,n_points=4):
     """
     顺时针旋转路径规划（w角度递减方向）。
     适用场景：放置到左托盘(R07等)，w需要从90→0→-90方向递减旋转。
@@ -648,21 +746,25 @@ def route_planning3_cw(startPos,EndPos,hight):
     #point = copy.deepcopy(startPos)
     #point['z'] = hight
     #poss.append(point)
-
-    for i in range(0,4):
+    
+    for i in range(0,n_points):
         point = {'x':0,'y':0,'z':0,'u':0,'v':90,'w':0} 
-        w_point = w_point_start + (w_point_end - w_point_start)/4*(i)
-        r = r_start +(r_end -r_start)/4*(i)
+        w_point = w_point_start + (w_point_end - w_point_start)/n_points*(i)
+        r = r_start +(r_end -r_start)/n_points*(i)
         point['x'] = r*math.cos(w_point/180*math.pi)
         point['y'] = r*math.sin(w_point/180*math.pi)
-        point['z'] = hight
-        point['w'] = w_start + (w_end - w_start)/4*(i)
-        if point['x'] < 650 and hight > 1100:
-            hight = 1100
+        if point['x'] < lower_x and hight > 1100:
+            point['z'] = 1000
+        else:
+            point['z'] = hight
+        point['w'] = w_start + (w_end - w_start)/n_points*(i)
         poss.append(point)
         
     point = copy.deepcopy(EndPos)
-    point['z'] = hight
+    if point['x'] < lower_x and hight > 1100:
+        point['z'] = 1000
+    else:
+        point['z'] = hight
     poss.append(point)
     poss_arm = []
     for i in poss:
@@ -676,7 +778,7 @@ def route_planning3_cw(startPos,EndPos,hight):
     return poss,poss_arm
 
 
-def route_planning3_ccw(startPos,EndPos,hight):
+def route_planning3_ccw(startPos,EndPos,hight,lower_x=650,n_points=4):
     """
     逆时针旋转路径规划（w角度递增方向）。
     适用场景：放置到右托盘(R13等)，w需要从90→180→270(-90)方向递增旋转。
@@ -710,20 +812,24 @@ def route_planning3_ccw(startPos,EndPos,hight):
     #point['z'] = hight
     #poss.append(point)
 
-    for i in range(0,4):
+    for i in range(0,n_points):
         point = {'x':0,'y':0,'z':0,'u':0,'v':90,'w':0} 
-        w_point = w_point_start + (w_point_end - w_point_start)/4*(i)
-        r = r_start +(r_end -r_start)/4*(i)
+        w_point = w_point_start + (w_point_end - w_point_start)/n_points*(i)
+        r = r_start +(r_end -r_start)/n_points*(i)
         point['x'] = r*math.cos(w_point/180*math.pi)
         point['y'] = r*math.sin(w_point/180*math.pi)
-        point['z'] = hight
-        point['w'] = w_start + (w_end - w_start)/4*(i)
-        if point['x'] < 650 and hight > 1100:
-            hight = 1100
+        if point['x'] < lower_x and hight > 1100:
+            point['z'] = 1000
+        else:
+            point['z'] = hight
+        point['w'] = w_start + (w_end - w_start)/n_points*(i)
         poss.append(point)
         
     point = copy.deepcopy(EndPos)
-    point['z'] = hight
+    if point['x'] < lower_x and hight > 1100:
+        point['z'] = 1000
+    else:
+        point['z'] = hight
     poss.append(point)
     poss_arm = []
     for i in poss:
@@ -736,16 +842,18 @@ def route_planning3_ccw(startPos,EndPos,hight):
     
     return poss,poss_arm
 
-def route_planning3_auto(startPos,EndPos,hight,preferred='cw'):
+def route_planning3_auto(startPos,EndPos,hight,preferred='cw',lower_x=None,n_points=4):
     """
     自适应旋转路径规划：优先按指定方向，若中间点超限则自动回退到反向。
     preferred: 'cw' 顺时针优先(R07等), 'ccw' 逆时针优先(R13等)
     """
     # 首选方向
+    cw_lower = 650 if lower_x is None else lower_x
+    ccw_lower = 650 if lower_x is None else lower_x
     if preferred == 'cw':
-        poss, poss_arm = route_planning3_cw(startPos, EndPos, hight)
+        poss, poss_arm = route_planning3_cw(startPos, EndPos, hight, cw_lower, n_points)
     else:
-        poss, poss_arm = route_planning3_ccw(startPos, EndPos, hight)
+        poss, poss_arm = route_planning3_ccw(startPos, EndPos, hight, ccw_lower, n_points)
     
     # 检查中间点是否超限
     all_ok = True
@@ -757,9 +865,9 @@ def route_planning3_auto(startPos,EndPos,hight,preferred='cw'):
     if not all_ok:
         config.log.logger.info(f"首选方向({preferred})超限，自动回退到反向")
         if preferred == 'cw':
-            poss, poss_arm = route_planning3_ccw(startPos, EndPos, hight)
+            poss, poss_arm = route_planning3_ccw(startPos, EndPos, hight, ccw_lower, n_points)
         else:
-            poss, poss_arm = route_planning3_cw(startPos, EndPos, hight)
+            poss, poss_arm = route_planning3_cw(startPos, EndPos, hight, cw_lower, n_points)
         
         for j in poss_arm:
             if not CheckLimit(j, "route_planning3_auto"):
@@ -1332,6 +1440,26 @@ def IdentificationAction2(ident_point,ident_euler,hight):
     else:
         links = config.setLinks.links_action2(poss)
     return links
+
+def IdentificationAction3(ident_point,ident_euler,hight):
+    poss = []               
+    #hight = 950
+    startPos = copy.deepcopy(config.currentPos)
+    EndPos = {'x':ident_point[0],'y':ident_point[1],'z':hight,'u':ident_euler['u'],'v':ident_euler['v'],'w':ident_euler['w']}               
+    trans,poss_arm = route_planning3_auto(startPos,EndPos,hight,lower_x=0,n_points=6)
+    poss = copy.deepcopy(poss_arm)
+    poss.append({'x':int(ident_point[0]*1000),'y':int(ident_point[1]*1000),'z':int(ident_point[2]*1000),'u':int(ident_euler['u']*1000),'v':int(ident_euler['v']*1000),'w':int(ident_euler['w']*1000)}) 
+    for p in poss:
+        if not CheckLimit(p, "IdentificationAction3"):
+            return False
+    # links = config.setLinks.links_action2(poss)
+    # return links
+    if config.currentPos['ID'] == 4:
+        links = config.setLinks.links_action22(poss)
+        # input("暂停")
+    else:
+        links = config.setLinks.links_action2(poss)
+    return links
 #纯旋转动作（不变位置，只旋转姿态，不经过route_planning避免限位）
 def RotationAction(ident_point,ident_euler,hight):
     poss = []
@@ -1435,15 +1563,17 @@ def SlittingAction2(vector133,vector134,vector_qie,euler10_2):
     return links
 
 #翻箱动作
-def MouldTurnoverAction(mouldEuler,vector_xipan,vector51,vector53,vector53_2,vector56,firstEuler,twiceEuler,derW,carton_height,derVector1,derVector2):    
+def MouldTurnoverAction(mouldEuler,vector_xipan,vector51,vector53,vector53_2,vector56,firstEuler,twiceEuler,derW,carton_height,derVector1,derVector2):
     euler2 = firstEuler
 
-    poss = []
-    poss.append({'x':int(-0.038*1000),'y':int(18.407*1000),'z':int(-25.890*1000),'u':int(-0.098*1000),'v':int(23.482*1000),'w':int(0.087*1000)})
-                
     vector_xipan_2 = revolve(euler2,vector_xipan)
     vector54 = vector51 + revolve({ 'u':0, 'v':0, 'w':derW},vector53)
-    vector70 = vector54 - vector_xipan_2 
+    vector70 = vector54 - vector_xipan_2
+
+    poss = []
+    # 动态生成过渡关节位置，限制x轴移动距离不超过200mm
+    default_poss0 = {'x':int(-0.038*1000),'y':int(17.407*1000),'z':int(-35.890*1000),'u':int(-0.078*1000),'v':int(34.234*1000),'w':int(0.052*1000)}
+    poss.append(get_dynamic_transition_poss0(default_poss0))
 
     poss.append({'x':int((vector70[0]+derVector1[0])*1000),'y':int((vector70[1]+derVector1[1])*1000),'z':int((vector70[2]+250)*1000),'u':int(euler2['u']*1000),'v':int((euler2['v'])*1000),'w':int((euler2['w'])*1000)})
     poss.append({'x':int((vector70[0]+derVector1[0])*1000),'y':int((vector70[1]+derVector1[1])*1000),'z':int((vector70[2]+derVector1[2])*1000),'u':int(euler2['u']*1000),'v':int((euler2['v'])*1000),'w':int((euler2['w'])*1000)})
@@ -1452,8 +1582,12 @@ def MouldTurnoverAction(mouldEuler,vector_xipan,vector51,vector53,vector53_2,vec
     vector53 = vector53_2
                 
     mouldEulerLIst = []
+    # 使用非线性递增：前面角度小，后面角度大，总角度保持不变
+    # 使用平方函数：(i/8)^2 * 8，这样前面步长小，后面步长大
     for i in range(0,9):
-        mouldEulerLIst.append({ 'u':mouldEuler['u']*i, 'v':mouldEuler['v']*i, 'w':mouldEuler['w'] })     
+        # 非线性因子：使用平方函数实现前小后大
+        nonlinear_factor = (i / 8.0) ** 1.5 * 8  # 1.5次方，比线性更平缓的开始
+        mouldEulerLIst.append({ 'u':mouldEuler['u']*nonlinear_factor, 'v':mouldEuler['v']*nonlinear_factor, 'w':mouldEuler['w'] })     
         
     euler2 = { 'u':(firstEuler['u']+twiceEuler['u'])/2, 'v':(firstEuler['v']+twiceEuler['v'])/2, 'w':(firstEuler['w']+twiceEuler['w'])/2} 
     vector_xipan_2 = revolve(euler2,vector_xipan)
@@ -1498,7 +1632,7 @@ def MouldTurnoverAction(mouldEuler,vector_xipan,vector51,vector53,vector53_2,vec
     vector53 = (100/((vector53[0]**2+vector53[1]**2)**0.5))*vector53#
     #vector54 = vector51 + revolve(mouldEulerLIst[1]*10,vector53)
     # vector54 = vector51 + revolve( {'u':mouldEulerLIst[1]['u']*10, 'v':mouldEulerLIst[1]['v']*10, 'w':mouldEulerLIst[1]['w']*10 },vector53)
-    vector54 = vector56 + revolve( {'u':mouldEulerLIst[1]['u']*10, 'v':mouldEulerLIst[1]['v']*10, 'w':mouldEulerLIst[1]['w']*10 },vector53)
+    vector54 = vector56 + revolve( {'u':mouldEuler['u']*10, 'v':mouldEuler['v']*10, 'w':mouldEuler['w']*10 },vector53)
     vector71 = vector54 - vector_xipan_2  
 
     poss.append({'x':int(vector71[0]*1000),'y':int(vector71[1]*1000),'z':int((vector71[2]+10)*1000),'u':int(euler2['u']*1000),'v':int(euler2['v']*1000),'w':int((euler2['w'])*1000)})            
@@ -1508,6 +1642,10 @@ def MouldTurnoverAction(mouldEuler,vector_xipan,vector51,vector53,vector53_2,vec
     for i in range(0,len(poss)):
         # 跳过全零的占位符位置
         if poss[i]['x'] == 0 and poss[i]['y'] == 0 and poss[i]['z'] == 0:
+            continue
+        # poss[0]是关节坐标过渡点(非笛卡尔位姿),其合法性已由get_dynamic_transition_poss0
+        # 内部的inverse_solution保证,此处不能用CheckLimit做笛卡尔逆解校验,否则会误报超限
+        if i == 0:
             continue
         success = CheckLimit(poss[i], "MouldTurnoverAction")
         if not success:
@@ -1994,7 +2132,8 @@ def SCARAMain():
                     # vector10 = np.array([278.82039642, 4.62224229, 324.26128874])#[-250,4,313]#刀片偏移
                     # vector10 = np.array([267.82039642, 4.62224229, 324.26128874])#[-250,4,313]#刀片偏移 需要修改
                     if carton_dir == 0:
-                        vector10 = np.array([272.72372349,   8.05363711, 314.87578845])
+                        # vector10 = np.array([272.72372349,   8.05363711, 314.87578845])
+                        vector10 = np.array([267.72372349,   8.05363711, 314.87578845])
                     if carton_dir == 1:
                         vector10 = np.array([262.72372349,   8.05363711, 314.87578845])
                     # vector10 = np.array([267.82039642, 4.62224229, 324.26128874])
@@ -2138,13 +2277,13 @@ def SCARAMain():
             if getStep() == False: 
                 # vector_xipan = np.array([3.82524579, 185.32992087, 310.38751022])#翻箱片偏移
                 #gui6.2
-                vector_xipan = np.array([ -0.70160645  , 180.62001267 -40, 320.4370298 -20 ])#翻箱片偏移
+                vector_xipan = np.array([ -0.70160645  , 140.62001267 , 300.4370298  ])#翻箱片偏移
                 
                 #vector_xipan = np.array([6.41459874,183.64143843,308.92476951])
                 vector50 = 0.5*starVector+0.5*endVector#中心点
                 #vector50[1] = vector50[1] - frequency*7
                 #
-                vector53 = np.array([0,Width + 10,0])#旋转偏移
+                vector53 = np.array([0,Width + 15,0])#旋转偏移
                 vector51 = vector50 - revolve({ 'u':0, 'v':0, 'w':euler1['w']-euler0_0['w'] },vector53)
                 vector56 = vector51 + 0.7*revolve({ 'u':0, 'v':0, 'w':euler1['w']-euler0_0['w'] },np.array([Lenth,0,0]))
                 vector53_2 = vector53-np.array([0,40,0])
@@ -2166,8 +2305,8 @@ def SCARAMain():
                     config.action = 200
                 else:
                     config.action = 11
-                derVector1 = np.array([0,20,-15])
-                derVector2 = np.array([0,-20,-20])
+                derVector1 = np.array([0,20,-15])  # 增加插入深度从-15到-25
+                derVector2 = np.array([0,-20,-20])  # 增加插入深度从-20到-30
                 config.links = MouldTurnoverAction(mouldEuler,vector_xipan,vector51,vector53,vector53_2,vector56,firstEuler,twiceEuler,derW,carton_height,derVector1,derVector2)
                 if config.links == False:
                     config.action = 1001
@@ -2178,15 +2317,15 @@ def SCARAMain():
                 center = copy.deepcopy(0.5*starVector+0.5*endVector)
                 vector61 = GetTwiceIdentPoint(center,vector1,euler1,800)
                 poss = []
-                # if carton_height == 2:
-                #     poss.append({'x':int(-0.038*1000),'y':int(18.407*1000),'z':int(-41.890*1000),'u':int(-0.098*1000),'v':int(23.482*1000),'w':int(0.087*1000)})
-                # else :
-                    # poss.append({'x':int(0*1000),'y':int(-1.408*1000),'z':int(-54.165*1000),'u':int(-0.082*1000),'v':int(55.569*1000),'w':int(0.046*1000)})
                 if carton_height == 2:
-                    poss.append({'x':int(-0.038*1000),'y':int(18.407*1000),'z':int(-41.890*1000),'u':int(-0.098*1000),'v':int(23.482*1000),'w':int(0.087*1000)})
-                else :
-                    poss.append({'x':int(0*1000),'y':int(-1.408*1000),'z':int(-41.890*1000),'u':int(-0.082*1000),'v':int(55.569*1000),'w':int(0.046*1000)})
-                poss.append({'x':int(vector61[0]*1000),'y':int(vector61[1]*1000),'z':int(vector61[2]*1000),'u':int(euler1['u']*1000),'v':int(euler1['v']*1000),'w':int(euler1['w']*1000)})  
+                    default_poss0 = {'x':int(-0.038*1000),'y':int(18.407*1000),'z':int(-41.890*1000),'u':int(-0.098*1000),'v':int(23.482*1000),'w':int(0.087*1000)}
+                   
+                else:
+                    default_poss0 = {'x':int(0*1000),'y':int(-1.408*1000),'z':int(-41.890*1000),'u':int(-0.082*1000),'v':int(55.569*1000),'w':int(0.046*1000)}
+                # 动态生成过渡关节位置，限制x轴移动距离
+                # poss.append(get_dynamic_transition_poss0(default_poss0))
+                poss.append(default_poss0)
+                poss.append({'x':int(vector61[0]*1000),'y':int(vector61[1]*1000),'z':int(vector61[2]*1000),'u':int(euler1['u']*1000),'v':int(euler1['v']*1000),'w':int(euler1['w']*1000)})
                 ok, adj_pos = AdjustPosByLimit(poss[-1], "links_action16_0", adjust_axis='x')
                 if ok:
                     poss[-1] = adj_pos
@@ -2233,10 +2372,10 @@ def SCARAMain():
                 # vector_xipan = np.array([-46.70158978, 183.63014186, 310.40850719])
                 #gui6.2
                 # [ -0.70160645, 180.62001267, 320.4370298 ]
-                vector_xipan = np.array([-46.70158978  , 183.63014186-40, 320.40850719 -20 ])
+                vector_xipan = np.array([-46.70158978  , 130.63014186, 300.40850719  ])
                 vector50 = 0.5*starVector+0.5*endVector
 
-                vector53 = np.array([0,-Width - 10,0])#旋转偏移
+                vector53 = np.array([0,-Width - 15,0])#旋转偏移
                 vector51 = vector50 - revolve({ 'u':0, 'v':0, 'w':euler1['w']-euler0_0['w'] },vector53)#旋转点
                 vector56 = vector51 + 0.7*revolve({ 'u':0, 'v':0, 'w':euler1['w']-euler0_0['w'] },np.array([Lenth,0,0]))
 
@@ -2262,8 +2401,8 @@ def SCARAMain():
                 kaixiangangle = 22.5
                 mouldEuler = {  'u':0-kaixiangangle, 'v':0, 'w':derW }
 
-                derVector1 = np.array([0,-20,-15])
-                derVector2 = np.array([0,20,-20])
+                derVector1 = np.array([0,-20,-15])  # 增加插入深度从-15到-25
+                derVector2 = np.array([0,20,-20])  # 增加插入深度从-20到-30
                 config.links =  MouldTurnoverAction(mouldEuler,vector_xipan,vector51,vector53,vector53_2,vector56,firstEuler,twiceEuler,derW,carton_height,derVector1,derVector2) 
                 if config.links == False:
                     config.action = 1001
@@ -2274,15 +2413,23 @@ def SCARAMain():
                 center = copy.deepcopy(0.5*starVector+0.5*endVector)
                 vector61 = GetTwiceIdentPoint(center,vector1,euler1,800)
 
+                # if carton_height == 2:
+                #     default_poss0 = {'x':int(-0.038*1000),'y':int(18.407*1000),'z':int(-25*1000),'u':int(-0.098*1000),'v':int(23.482*1000),'w':int(0.087*1000)}
+                # else:
+                #     default_poss0 = {'x':int(0*1000),'y':int(-1.408*1000),'z':int(-25*1000),'u':int(-0.082*1000),'v':int(55.569*1000),'w':int(0.046*1000)}
                 if carton_height == 2:
-                    poss.append({'x':int(-0.038*1000),'y':int(18.407*1000),'z':int(-25*1000),'u':int(-0.098*1000),'v':int(23.482*1000),'w':int(0.087*1000)})
-                else :
-                    poss.append({'x':int(0*1000),'y':int(-1.408*1000),'z':int(-25*1000),'u':int(-0.082*1000),'v':int(55.569*1000),'w':int(0.046*1000)})
-                poss.append({'x':int(vector61[0]*1000),'y':int(vector61[1]*1000),'z':int(vector61[2]*1000),'u':int(euler1['u']*1000),'v':int(euler1['v']*1000),'w':int(euler1['w']*1000)})  
+                    default_poss0 = {'x':int(-0.038*1000),'y':int(17.407*1000),'z':int(-35.890*1000),'u':int(-0.078*1000),'v':int(34.234*1000),'w':int(0.052*1000)}
+                else:
+                    default_poss0 = {'x':int(-0.038*1000),'y':int(17.407*1000),'z':int(-35.890*1000),'u':int(-0.078*1000),'v':int(34.234*1000),'w':int(0.052*1000)}
+                # 动态生成过渡关节位置，限制x轴移动距离
+                poss.append(get_dynamic_transition_poss0(default_poss0))
+                # poss.append(default_poss0)
+                poss.append({'x':int(vector61[0]*1000),'y':int(vector61[1]*1000),'z':int(vector61[2]*1000),'u':int(euler1['u']*1000),'v':int(euler1['v']*1000),'w':int(euler1['w']*1000)})
                 ok, adj_pos = AdjustPosByLimit(poss[-1], "links_action16_1", adjust_axis='x')
                 if ok:
                     poss[-1] = adj_pos
                 config.setLinks.links_action16(poss,Lenth*2,Width*2,1,rule)
+
                 config.action = 203
                 
         #if config.action == 203:#识别2，3页翻箱
@@ -2337,11 +2484,11 @@ def SCARAMain():
             if getStep() == False: 
                 # vector_xipan = np.array([3.82524579, 185.32992087, 310.38751022])#翻箱片偏移
                 #gui6.2
-                vector_xipan = np.array([ -0.70160645, 180.62001267 -40, 320.4370298 -20 ])#翻箱片偏移
+                vector_xipan = np.array([ -0.70160645, 130.62001267, 300.4370298  ])#翻箱片偏移
                 #vector_xipan = np.array([6.41459874,183.64143843,308.92476951])
                 vector50 = 0.5*starVector+0.5*endVector#中心点
                 #vector50[1] = vector50[1] - frequency*7
-                vector53 = np.array([0,Width+40,0])#旋转偏移
+                vector53 = np.array([0,Width+10,0])#旋转偏移
                 vector51 = vector50 - revolve({ 'u':0, 'v':0, 'w':euler1['w']-euler0_0['w'] },vector53)
                 vector56 = vector51 + 0.7*revolve({ 'u':0, 'v':0, 'w':euler1['w']-euler0_0['w'] },np.array([Lenth,0,0]))
                 
@@ -2385,10 +2532,10 @@ def SCARAMain():
         if config.action == 205:#刀片围绕左边缘做翻箱动作
             if getStep() == False: 
                 #gui6.2
-                vector_xipan = np.array([-46.70158978, 183.63014186-40, 320.40850719])
+                vector_xipan = np.array([-46.70158978, 120.63014186, 300.40850719])
                 vector50 = 0.5*starVector+0.5*endVector
 
-                vector53 = np.array([0,-Width-40,0])#旋转偏移
+                vector53 = np.array([0,-Width-10,0])#旋转偏移
                 vector51 = vector50 - revolve({ 'u':0, 'v':0, 'w':euler1['w']-euler0_0['w'] },vector53)#旋转点
                 vector56 = vector51 + 0.7*revolve({ 'u':0, 'v':0, 'w':euler1['w']-euler0_0['w'] },np.array([Lenth,0,0]))
 
@@ -2437,7 +2584,7 @@ def SCARAMain():
                     twiceEuler = { 'u':-90, 'v':0, 'w':derW}
                     #vector_xipan = np.array([-48.909,183.037,310.121])#翻箱片偏移
                     #gui6.2
-                    vector_xipan = np.array([-46.70158978 +10, 183.63014186-40, 320.40850719 ])#翻箱片偏移
+                    vector_xipan = np.array([-46.70158978 +10, 130.63014186, 300.40850719 ])#翻箱片偏移
                     euler50 = { 'u':0, 'v':0, 'w':euler1['w']}
                     vector50 = 0.5*starVector+0.5*endVector#中心点
                     vector51 = vector50 - revolve({ 'u':0, 'v':0, 'w':euler1['w']-euler0_0['w'] },np.array([Lenth,0,0]))
@@ -2458,7 +2605,7 @@ def SCARAMain():
                     twiceEuler = { 'u':-90, 'v':0, 'w':derW-180}                    
                     # vector_xipan = np.array([3.82524579, 185.32992087, 310.38751022])#翻箱片偏移
                     #gui6.2
-                    vector_xipan = np.array([ -0.70160645 +10, 180.62001267 -50, 320.4370298 -20 ])#翻箱片偏移
+                    vector_xipan = np.array([ 9.30160645 , 140.63014186 , 320.40850719  ])#翻箱片偏移
                     vector50 = 0.5*starVector+0.5*endVector#中心点
                     vector51 = vector50 - revolve({ 'u':0, 'v':0, 'w':euler1['w']-euler0_0['w'] },np.array([Lenth,0,0]))
                     vector53 = np.array([Width+40,0,0])#旋转偏移
@@ -2477,13 +2624,14 @@ def SCARAMain():
              
                 kaixiangangle = 22.5
                 mouldEuler = {  'u':0, 'v':0-kaixiangangle, 'w':derW }  
-                derVector1 = np.array([20,0,-15])
-                derVector2 = np.array([-20,0,-25])
+                derVector1 = np.array([20,0,-15])  # 增加插入深度从-15到-25
+                derVector2 = np.array([-20,0,-25])  # 增加插入深度从-25到-35
                 config.links = MouldTurnoverAction(mouldEuler,vector_xipan,vector51,vector53,vector53_2,vector56,firstEuler,twiceEuler,derW,carton_height,derVector1,derVector2)                
                 if config.links == False:
                     config.action = 1001
                     continue
                 config.action = 13
+                count_shang = 0  # 翻上页计数器
 
         if config.action == 13:#刀片围绕上边缘做翻箱动作
             if getStep() == False: 
@@ -2491,7 +2639,15 @@ def SCARAMain():
                 #vector_xipan = np.array([-250.988,1.971,283.315])#翻箱片偏移
                 # vector_xipan = np.array([-260.37451458,    3.53112586,  291.55552622])#翻箱片偏移
                 #gui6.2
-                vector_xipan = np.array([-281.21358258 +60,   30.67419854,  299.18651677])
+                # 根据翻页次数调整a值
+                count_shang += 1
+                if count_shang == 1:
+                    a = 10  # 第一次翻页
+                elif count_shang == 2:
+                    a = 15  # 第二次翻页
+                else:
+                    a = 20  # 第三次及以后翻页
+                vector_xipan = np.array([-281.21358258 +60 +a,   30.67419854,  299.18651677])
                 derW = euler1['w']-euler0_0['w']
                 firstEuler = { 'u':0, 'v':-90, 'w':180+derW}
                 vector50 = 0.5*starVector+0.5*endVector#中心点
@@ -2528,8 +2684,8 @@ def SCARAMain():
                 vector53_2 = vector53-np.array([-40,0,0])            
                 kaixiangangle = 22.5
                 mouldEuler = {  'u':0, 'v':0+kaixiangangle, 'w':derW }
-                derVector1 = np.array([-20,0,-15])
-                derVector2 = np.array([20,0,-25])
+                derVector1 = np.array([-20,0,-15])  # 增加插入深度从-15到-25
+                derVector2 = np.array([20,0,-25])  # 增加插入深度从-25到-35
                 config.links = MouldTurnoverAction(mouldEuler,vector_xipan,vector51,vector53,vector53_2,vector56,firstEuler,twiceEuler,derW,carton_height,derVector1,derVector2)
                 if config.links == False:
                     config.action = 1001
@@ -2543,11 +2699,13 @@ def SCARAMain():
                 vector0 = copy.deepcopy(vector61)
                 euler0 = copy.deepcopy(euler1)
                 if carton_height == 2:
-                    poss.append({'x':int(-0.038*1000),'y':int(18.407*1000),'z':int(-25*1000),'u':int(-0.098*1000),'v':int(23.482*1000),'w':int(0.087*1000)})
-                else :
-                    poss.append({'x':int(0*1000),'y':int(-1.408*1000),'z':int(-25.165*1000),'u':int(-0.082*1000),'v':int(55.569*1000),'w':int(0.046*1000)})
-                #poss.append({'x':int(0*1000),'y':int(-1.408*1000),'z':int(-54.165*1000),'u':int(-0.082*1000),'v':int(55.569*1000),'w':int(0.046*1000)})
-                poss.append({'x':int(vector0[0]*1000),'y':int(vector0[1]*1000),'z':int(vector0[2]*1000),'u':int(euler0['u']*1000),'v':int(euler0['v']*1000),'w':int(euler0['w']*1000)})   
+                    default_poss0 = {'x':int(-0.038*1000),'y':int(18.407*1000),'z':int(-25*1000),'u':int(-0.098*1000),'v':int(23.482*1000),'w':int(0.087*1000)}
+                else:
+                    default_poss0 = {'x':int(0*1000),'y':int(-1.408*1000),'z':int(-25.165*1000),'u':int(-0.082*1000),'v':int(55.569*1000),'w':int(0.046*1000)}
+                # 动态生成过渡关节位置，限制x轴移动距离
+                # poss.append(get_dynamic_transition_poss0(default_poss0))
+                poss.append(default_poss0)
+                poss.append({'x':int(vector0[0]*1000),'y':int(vector0[1]*1000),'z':int(vector0[2]*1000),'u':int(euler0['u']*1000),'v':int(euler0['v']*1000),'w':int(euler0['w']*1000)}) 
 
                 config.setLinks.links_action10(poss)#识别翻页 
                 config.links.append({'State':True, 'typeID': 16,'length': Lenth*2, 'width': Width*2,'type1': 1,'rule':rule})
@@ -2603,11 +2761,11 @@ def SCARAMain():
                     twiceEuler = { 'u':-90, 'v':0, 'w':derW}
                     #vector_xipan = np.array([-48.909,183.037,310.121])#翻箱片偏移
                     #gui6.2
-                    vector_xipan = np.array([-46.70158978, 183.63014186-40, 320.40850719])#翻箱片偏移
+                    vector_xipan = np.array([-36.70158978, 120.63014186, 300.40850719])#翻箱片偏移
                     euler50 = { 'u':0, 'v':0, 'w':euler1['w']}
                     vector50 = 0.5*starVector+0.5*endVector#中心点
                     vector51 = vector51 = vector50 - revolve({ 'u':0, 'v':0, 'w':euler1['w']-euler0_0['w'] },np.array([Lenth,0,0]))
-                    vector53 = np.array([Width+40,0,0])#旋转偏移                   
+                    vector53 = np.array([Width+20,0,0])#旋转偏移                   
                     vector53 = revolve({ 'u':0, 'v':0, 'w':-euler1['w']+euler0_0['w'] }, vector_fanye3-vector51)
                     if rule == 1:
                         vector51 = vector51 + revolve({ 'u':0, 'v':0, 'w':euler1['w']-euler0_0['w'] },np.array([0,vector53[1],0]))#旋转点
@@ -2624,10 +2782,10 @@ def SCARAMain():
                     twiceEuler = { 'u':-90, 'v':0, 'w':derW-180}                    
                     # vector_xipan = np.array([3.82524579, 185.32992087, 310.38751022])#翻箱片偏移
                     #gui6.2
-                    vector_xipan = np.array([ -0.70160645, 180.62001267 -40, 320.4370298 -20 ])#翻箱片偏移
+                    vector_xipan = np.array([ -0.70160645, 130.62001267, 300.4370298  ])#翻箱片偏移
                     vector50 = 0.5*starVector+0.5*endVector#中心点
                     vector51 = vector51 = vector50 - revolve({ 'u':0, 'v':0, 'w':euler1['w']-euler0_0['w'] },np.array([Lenth,0,0]))
-                    vector53 = np.array([Width+40,0,0])#旋转偏移
+                    vector53 = np.array([Width+20,0,0])#旋转偏移
                     vector53 = revolve({ 'u':0, 'v':0, 'w':-euler1['w']+euler0_0['w'] },vector_fanye4-vector51)
 
                     if rule == 1:
@@ -3244,7 +3402,7 @@ def SCARAMain():
                 config.log.logger.info(f"poss_box_center={poss_box_center}")
                 config.log.logger.info(f"poss_box_euler={poss_box_euler}")
 
-                links = IdentificationAction1(poss_box_center, poss_box_euler, hight) 
+                links = IdentificationAction3(poss_box_center, poss_box_euler, hight) 
                 config.links = links
                 # config.setLinks.links_action195(poss)
                 config.action = 196
@@ -3442,7 +3600,9 @@ def SCARAMain():
                    euler70 = { 'u':0, 'v':90, 'w':derW }
                 #    vector71 = np.array([140,-3.68,308.059])
                 #    vector71 =  np.array([140 ,-3.68,312.26128874   ]) 
-                   vector71 =  np.array([120  ,-3.68,312.26128874   ]) 
+                #    vector71 =  np.array([120  ,-3.68,312.26128874   ]) 
+                #    vector71 =  np.array([105  ,-3.68,312.26128874   ]) 
+                   vector71 =  np.array([105  ,7,312.26128874   ])
                    #vector71 = np.array([110,6.5,320])
                    
 
@@ -3452,7 +3612,8 @@ def SCARAMain():
                     euler71 = { 'u':0, 'v':90, 'w':derW -45 - anglew }
                     # vector71 = np.array([140,-3.68,308.059])
                     # vector71 = np.array([140 ,-3.68,312.26128874   ]) 
-                    vector71 = np.array([105 ,-3.68,312.26128874   ]) 
+                    # vector71 = np.array([105 ,-3.68,312.26128874   ]) 
+                    vector71 = np.array([105 ,7,312.26128874   ]) 
                 # if carton0 == 0:
                 #     carton0 = 3
                 zxgs = 0   
