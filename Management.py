@@ -101,24 +101,30 @@ class ManagementConnect(threading.Thread):
                                     pass
                     except UnicodeDecodeError:
                         pass
-            except OSError:
-                traceback.print_exc()
+            except OSError as e:
+                config.camera_offline = True
+                config.log.logger.warning(f"Vision socket disconnected ({type(e).__name__}), set camera_offline=True")
                 self.threadPause()
                 self.connection.close()
                 time.sleep(1)
                 try:
                     self.connection, self.address = self.sck.accept()
                     self.connection.settimeout(60)
+                    config.camera_offline = False
+                    config.log.logger.info("Vision socket reconnected, set camera_offline=False")
                 except:
                     pass
             except Exception as e:
-                config.log.logger.error(f'视觉连接异常: {str(e)}')
+                config.log.logger.error(f'Vision connection error: {str(e)}')
+                config.camera_offline = True
                 self.threadPause()
                 self.connection.close()
                 time.sleep(1)
                 try:
                     self.connection, self.address = self.sck.accept()
                     self.connection.settimeout(60)
+                    config.camera_offline = False
+                    config.log.logger.info("Vision socket reconnected, set camera_offline=False")
                 except:
                     pass
 

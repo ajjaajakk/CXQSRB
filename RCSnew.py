@@ -69,6 +69,37 @@ class RCSServer(threading.Thread):
         self.stateList2 = "empty"
         self.Tray = 0
 
+        # 报警信息管理（移植自报警系统设计文档）
+        self.alarm_list = []          # 报警列表
+        self.alarm_counter = {}       # 按报警码计数
+        self.task_error_msg = ""      # 任务错误信息（英文）
+
+    def add_alarm(self, level, code, desc, describe="", method="", reason=""):
+        """添加报警信息"""
+        code_str = str(code)
+        if code_str in self.alarm_counter:
+            self.alarm_counter[code_str]["times"] += 1
+        else:
+            alarm_item = {
+                "code": code_str,
+                "desc": desc,
+                "times": 1,
+                "stime": int(time.time()),
+                "describe": describe,
+                "method": method,
+                "reason": reason,
+                "level": level
+            }
+            self.alarm_counter[code_str] = alarm_item
+            self.alarm_list.append(alarm_item)
+
+    def clear_alarm(self, code):
+        """清除指定报警码"""
+        code_str = str(code)
+        if code_str in self.alarm_counter:
+            del self.alarm_counter[code_str]
+            self.alarm_list[:] = [a for a in self.alarm_list if a["code"] != code_str]
+
     def run(self):
         try:
             while True:
@@ -278,9 +309,9 @@ class RCSServer(threading.Thread):
                         "endAddress": endAddress
                     }
                     resp = {
-                        "ret_code": 0,
+                        "ret_code": self.ret_code,
                         "create_time": str(time.time()),
-                        "err_msg": 0,
+                        "err_msg": self.task_error_msg if self.task_error_msg else "0",
                         "act_status": self.act_status,
                         "arm_status": self.arm_status,
                         "act_name": self.act_name,
@@ -307,41 +338,57 @@ class RCSServer(threading.Thread):
                     packet = self.build_packet(seq_num, new_msg_type, resp)
                     sock.sendall(packet)
                 elif msg_type == 1013:  # 设备报警信息
-                    b = 0
-                    if self.code != "0" or self.shared.code2 != "0":
-                        if self.shared.code2 != "0":
-                            b += 1
-                            a1 = [{
-                                "code": "40016",
-                                "desc": "emc_status",
-                                "times": 0+b,
-                                "stime": self.time
-                            }]
+                    # 收集报警信息：errors / warnings / notices
+                    errors_list = []
+                    warnings_list = []
+                    notices_list = []
+
+                    # 1. 来自报警管理器的报警（设备掉线/任务异常等）
+                    for a in self.alarm_list:
+                        item = {
+                            "code": a["code"],
+                            "desc": a["desc"],
+                            "times": a["times"],
+                            "stime": a["stime"]
+                        }
+                        if a.get("level") == "error":
+                            errors_list.append(item)
+                        elif a.get("level") == "warning":
+                            warnings_list.append(item)
                         else:
-                            a1 = [{
-                                "code":self.code,
-                                "desc":self.desc,
-                                "times": self.cs,
-                                "stime": self.time
-                            }]
-                        resp = {
-                            "errors": a1,
-                            "ret_code": self.ret_code,
-                            "create_time": str(time.time()),
-                            "err_msg": "0"
-                        }
-                        new_msg_type = msg_type + 10000
-                        packet = self.build_packet(seq_num, new_msg_type, resp)
-                        sock.sendall(packet)
-                    else:
-                        resp = {
-                            "ret_code": self.ret_code,
-                            "create_time": str(time.time()),
-                            "err_msg": "0"
-                        }
-                        new_msg_type = msg_type + 10000
-                        packet = self.build_packet(seq_num, new_msg_type, resp)
-                        sock.sendall(packet)
+                            notices_list.append(item)
+
+                    # 2. 软急停（emc）报警，保留原有逻辑
+                    if self.shared.code2 != "0":
+                        errors_list.append({
+                            "code": "40016",
+                            "desc": "emc_status",
+                            "times": 1,
+                            "stime": int(self.time) if self.time else int(time.time())
+                        })
+                    elif self.code != "0":
+                        errors_list.append({
+                            "code": self.code,
+                            "desc": self.desc,
+                            "times": self.cs,
+                            "stime": int(self.time) if self.time else int(time.time())
+                        })
+
+                    # 3. 组装响应
+                    resp = {
+                        "ret_code": self.ret_code,
+                        "create_time": str(time.time()),
+                        "err_msg": "0"
+                    }
+                    if errors_list:
+                        resp["errors"] = errors_list
+                    if warnings_list:
+                        resp["warnings"] = warnings_list
+                    if notices_list:
+                        resp["notices"] = notices_list
+                    new_msg_type = msg_type + 10000
+                    packet = self.build_packet(seq_num, new_msg_type, resp)
+                    sock.sendall(packet)
                 elif msg_type == 2300:  # 设备软急停
                     if payload['status'] == True:
                         print('1')

@@ -5,6 +5,7 @@ import math
 from _socket import *
 from threading import Thread ,Timer
 import datetime
+import threading
 import time
 import config
 from datetime import datetime
@@ -1732,12 +1733,116 @@ def SCARAMain():
     pos_mren = []
     poss = []
     a = 0
+
+    # ==================== 报警系统（移植自机械臂报警系统移植设计文档 V2.0）====================
+    def _add_alarm(level, code, desc, describe="", method="", reason=""):
+        """添加报警信息，同步到 RCS"""
+        rcs.add_alarm(level, code, desc, describe, method, reason)
+        rcs2.add_alarm(level, code, desc, describe, method, reason)
+        config.log.logger.warning(f"[Alarm] [{level}] {code} - {desc}")
+
+    def _clear_alarm(code):
+        """清除指定报警码"""
+        rcs.clear_alarm(code)
+        rcs2.clear_alarm(code)
+
+    def _set_task_error(ret_code, err_msg):
+        """设置任务异常状态"""
+        for server in (rcs, rcs2):
+            server.ret_code = ret_code
+            server.task_error_msg = err_msg
+            server.act_status = 5
+            server.arm_status = 2
+            rcs.CurrentStatus = "Idle"
+        config.log.logger.error(f"Task error: ret_code={ret_code}, err_msg={err_msg}")
+
+    def _set_task_success():
+        """设置任务成功状态"""
+        for server in (rcs, rcs2):
+            server.ret_code = 0
+            server.task_error_msg = ""
+            rcs.CurrentStatus = "Idle"
+        config.log.logger.info("Task success")
+
+    def _reset_device_error(code):
+        """设备恢复后清除对应错误状态"""
+        for server in (rcs, rcs2):
+            if server.ret_code == code:
+                server.ret_code = 0
+                server.task_error_msg = ""
+
+    def _check_devices_before_task():
+        """任务前检查设备状态（相机+机械臂）"""
+        if config.camera_offline:
+            _add_alarm("error", "1009", "Camera offline")
+            return False, 1009, "Camera offline"
+        if hasattr(config, 'scara') and config.scara and config.scara.sendPaused:
+            _add_alarm("error", "1011", "Arm disconnected")
+            return False, 1011, "Arm disconnected"
+        return True, 0, ""
+
+    def _device_heartbeat_check():
+        """设备心跳检测线程，每5秒轮询一次（无PLC，只检查相机和机械臂）"""
+        camera_was_offline = False
+        arm_was_offline = False
+        while True:
+            try:
+                time.sleep(5)
+                # 检查相机（config.camera_offline 由 ManagementConnect 线程维护）
+                if config.camera_offline:
+                    if not camera_was_offline:
+                        _add_alarm("error", "1009", "Camera offline",
+                                   describe="Vision system disconnected",
+                                   method="Check camera power and vision software",
+                                   reason="Camera powered off or vision software crashed")
+                    camera_was_offline = True
+                else:
+                    if camera_was_offline:
+                        config.log.logger.info("Camera connection restored")
+                        camera_was_offline = False
+                        _reset_device_error(1009)
+                    _clear_alarm("1009")
+                # 检查机械臂（sendPaused=True 表示连接断开）
+                if hasattr(config, 'scara') and config.scara:
+                    if config.scara.sendPaused:
+                        if not arm_was_offline:
+                            _add_alarm("error", "1011", "Arm disconnected",
+                                       describe="SCARA arm connection lost",
+                                       method="Check arm power and network",
+                                       reason="Arm powered off or network disconnected")
+                        arm_was_offline = True
+                    else:
+                        if arm_was_offline:
+                            config.log.logger.info("Arm connection restored")
+                            arm_was_offline = False
+                            _reset_device_error(1011)
+                        _clear_alarm("1011")
+            except Exception as e:
+                config.log.logger.error(f"Heartbeat check error: {e}")
+
+    # 启动设备心跳检测线程
+    heartbeat_thread = threading.Thread(target=_device_heartbeat_check, daemon=True, name="DeviceHeartbeat")
+    heartbeat_thread.start()
+    config.log.logger.info("Device heartbeat check thread started")
     current_time = datetime.now()
     #config.database.insert(str(current_time),1,1,2,3,4,5,6)
     #pos_mren = StarStartUpPreparation()
     while True:
         if a == 0:
             project = rcs.business_queue.get()
+             # 任务前检查设备状态，掉线则拒绝任务并等待恢复
+            ok, err_code, err_msg = _check_devices_before_task()
+            if not ok:
+                _set_task_error(err_code, err_msg)
+                config.log.logger.warning(f"Device offline, task rejected: {err_msg}")
+                while True:
+                    time.sleep(3)
+                    ok2, _, _ = _check_devices_before_task()
+                    if ok2:
+                        _set_task_success()
+                        config.log.logger.info("Device recovered, ready for new task")
+                        break
+                continue
             rcs2.act_parameter = project['act_parameter']
             print(rcs2.act_parameter)
             rcs2.act_id = rcs.act_id
@@ -1770,8 +1875,15 @@ def SCARAMain():
         current_time = datetime.now()
         #config.links =[]#-------------------------------------------------
 
-        if config.camera_offline and config.action not in [0, 1000, 1001]:
-            config.log.logger.error("相机掉线，任务终止!")
+        if (config.camera_offline or (hasattr(config, 'scara') and config.scara and config.scara.sendPaused)) and config.action not in [0, 1000, 1001]:
+            device = "Camera" if config.camera_offline else "Arm"
+            err_code = 1009 if config.camera_offline else 1011
+            config.log.logger.error(f"{device} offline, task terminated!")
+            _add_alarm("error", str(err_code), f"{device} offline",
+                       describe=f"{device} disconnected during task",
+                       method=f"Check {device.lower()} connection",
+                       reason=f"{device} powered off or network disconnected")
+            _set_task_error(err_code, f"{device} offline")
             config.action = 1001
             continue
         
@@ -3810,6 +3922,7 @@ def SCARAMain():
             if getStep() == False:
                 flag_a = 0
                 config.log.logger.info("任务完成，等待新任务...")
+                _set_task_success()
                 
                 if carton_height == -1:
                     carton_dir = 0
@@ -3844,6 +3957,19 @@ def SCARAMain():
                     config.links = config.setLinks.links_action22(poss)#回到初始点 
                 while a == 0:
                     project = rcs.business_queue.get()
+                    # 任务前检查设备状态，掉线则拒绝任务并等待恢复
+                    ok, err_code, err_msg = _check_devices_before_task()
+                    if not ok:
+                        _set_task_error(err_code, err_msg)
+                        config.log.logger.warning(f"Device offline, task rejected: {err_msg}")
+                        while True:
+                            time.sleep(3)
+                            ok2, _, _ = _check_devices_before_task()
+                            if ok2:
+                                _set_task_success()
+                                config.log.logger.info("Device recovered, ready for new task")
+                                break
+                        continue
                     rcs2.act_parameter = project['act_parameter']
                     print("新任务参数:", rcs2.act_parameter)
                     rcs2.act_id = rcs.act_id
@@ -3881,12 +4007,20 @@ def SCARAMain():
                             config.action = 160
         if config.action == 1001: #结束回复
             if getStep() == False:
+                rcs.CurrentStatus = "Idle"
                 rcs.act_status = 5
                 rcs2.act_status = 5
                 rcs.arm_status = 2
                 rcs2.arm_status = 2
                 flag_a = 0
-                config.log.logger.info("任务失败，等待新任务...")
+                config.log.logger.info("Task failed, waiting for new task...")
+                # 添加任务失败报警（若未由相机掉线等设备异常设置，则标记为任务异常）
+                if rcs.ret_code == 0:
+                    _add_alarm("error", "1030", "Task execution failed",
+                               describe="Task failed during execution",
+                               method="Check task log for details",
+                               reason="Task execution error")
+                    _set_task_error(1030, "Task execution failed")
                 
                 # if carton_height == -1:
                 #     carton_dir = 0
@@ -3908,6 +4042,19 @@ def SCARAMain():
                 a = 0
                 while a == 0:
                     project = rcs.business_queue.get()
+                    # 任务前检查设备状态，掉线则拒绝任务并等待恢复
+                    ok, err_code, err_msg = _check_devices_before_task()
+                    if not ok:
+                        _set_task_error(err_code, err_msg)
+                        config.log.logger.warning(f"Device offline, task rejected: {err_msg}")
+                        while True:
+                            time.sleep(3)
+                            ok2, _, _ = _check_devices_before_task()
+                            if ok2:
+                                _set_task_success()
+                                config.log.logger.info("Device recovered, ready for new task")
+                                break
+                        continue
                     rcs2.act_parameter = project['act_parameter']
                     print("新任务参数:", rcs2.act_parameter)
                     rcs2.act_id = rcs.act_id
