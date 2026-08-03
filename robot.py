@@ -3705,7 +3705,7 @@ def SCARAMain():
                     vector81 = np.array([-1308,720,310])
                     hight = 1200
                 
-                config.log.logger.info("抓箱子推动动作")                    
+                config.log.logger.info("抓箱子推动动作 ")                    
                 config.log.logger.info(f"carton0={carton0}")
                 # else:
                 #     push_offset = np.array([-100,0,0])
