@@ -265,6 +265,12 @@ class RCSServer(threading.Thread):
                     # self.a23 = 1
                     # self.singleAct.cancel()
                     # self.singleAct.cancel()
+                    # 清除任务相关报警，避免下一个任务接收到残留报警
+                    self._clear_alarm("1030")
+                    self._clear_alarm("1032")
+                    self.ret_code = 0
+                    self.err_msg = "0"
+                    self.task_error_msg = ""
                     resp = {
                         "ret_code": 0,
                         "create_time": str(time.time()),
@@ -274,6 +280,7 @@ class RCSServer(threading.Thread):
                     new_msg_type = msg_type + 10000
                     packet = self.build_packet(seq_num, new_msg_type, resp)
                     sock.sendall(packet)
+                    self.log.logger.info("任务已取消，清除任务报警(1030, 1032)")
                 elif msg_type == 1024:  # 动作进度
                     if 'startAddress' in self.act_parameter and 'endAddress' in self.act_parameter:
                         start_addr = self.act_parameter['startAddress']
