@@ -266,8 +266,8 @@ class RCSServer(threading.Thread):
                     # self.singleAct.cancel()
                     # self.singleAct.cancel()
                     # 清除任务相关报警，避免下一个任务接收到残留报警
-                    self._clear_alarm("1030")
-                    self._clear_alarm("1032")
+                    self.clear_alarm("1030")
+                    self.clear_alarm("1032")
                     self.ret_code = 0
                     self.err_msg = "0"
                     self.task_error_msg = ""
