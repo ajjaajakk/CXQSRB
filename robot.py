@@ -1063,7 +1063,7 @@ def StarStartUpPreparation():
                 vectorStart = np.array([config.currentPos['x'],config.currentPos['y'],config.currentPos['z']])
                 eulerStart = { 'u':config.currentPos['u'], 'v':config.currentPos['v'], 'w':config.currentPos['w'] }
                 config.database.insert(str(current_time),0,vectorStart[0],vectorStart[1],vectorStart[2],eulerStart['u'],eulerStart['v'],eulerStart['w'])
-                hight = 1000
+                hight = 1100
                 startPos = copy.deepcopy(config.currentPos)
                 EndPos = {'x':583,'y':1101,'z':hight,'u':0,'v':90,'w':0}               
                 trans,poss_arm = route_planning(startPos,EndPos,hight)
@@ -3780,12 +3780,12 @@ def SCARAMain():
                     poss.append({'x':int(vector81[0]*1000),'y':int(vector81[1]*1000),'z':int((vector81[2]+20)*1000),'u':int(0),'v':int(90000),'w':int(135000)})
                     poss.append({'x':int(vector72[0]*1000),'y':int((vector72[1]-3)*1000),'z':int((vector82[2])*1000),'u':int(euler71['u']*1000),'v':int(euler71['v']*1000),'w':int(euler71['w']*1000)})
                     poss.append({'x':int(vector72[0]*1000),'y':int((vector72[1]-3)*1000),'z':int((vector72[2]+70)*1000),'u':int(euler71['u']*1000),'v':int(euler71['v']*1000),'w':int(euler71['w']*1000)})     
-                    poss.append({'x':int(vector76[0]*1000),'y':int(vector76[1]*1000),'z':int((950)*1000),'u':int(0),'v':int(90000),'w':int(135000)})
+                    poss.append({'x':int(vector76[0]*1000),'y':int(vector76[1]*1000),'z':int((1100)*1000),'u':int(0),'v':int(90000),'w':int(135000)})
                     poss.append({'x':int(vector81[0]*1000),'y':int(vector81[1]*1000),'z':int((vector81[2])*1000),'u':int(0),'v':int(90000),'w':int(135000)})
                     poss.append({'x':int(vector81[0]*1000),'y':int(vector81[1]*1000),'z':int((vector81[2])*1000),'u':int(0),'v':int(90000),'w':int(135000)})
                     poss.append({'x':int(vector81[0]*1000),'y':int(vector81[1]*1000),'z':int((vector81[2])*1000),'u':int(0),'v':int(90000),'w':int(135000)})
                     print("抓箱子直接动作")
-                    hight = 950
+                    hight = 1100
                     config.log.logger.info("抓箱子直接动作")
                 elif carton0 == 3:
                     # vector76 = np.array([-1308,690,310])
@@ -3795,7 +3795,7 @@ def SCARAMain():
                     poss.append({'x':int(vector72[0]*1000),'y':int((vector72[1]-3)*1000),'z':int((vector72[2]+70)*1000),'u':int(euler71['u']*1000),'v':int(euler71['v']*1000),'w':int(euler71['w']*1000)})   
                     print("抓箱子推动动作")
                     config.log.logger.info("抓箱子推动动作")
-                    poss.append({'x':int(vector76[0]*1000),'y':int(vector76[1]*1000),'z':int((950)*1000),'u':int(0),'v':int(90000),'w':int(135000)})
+                    poss.append({'x':int(vector76[0]*1000),'y':int(vector76[1]*1000),'z':int((1100)*1000),'u':int(0),'v':int(90000),'w':int(135000)})
                     poss.append({'x':int(vector76[0]*1000),'y':int(vector76[1]*1000),'z':int((420)*1000),'u':int(0),'v':int(90000),'w':int(135000)})
                     poss.append({'x':int(vector81[0]*1000),'y':int(vector81[1]*1000),'z':int((420)*1000),'u':int(0),'v':int(90000),'w':int(135000)})
                     poss.append({'x':int(vector81[0]*1000),'y':int(vector81[1]*1000),'z':int((vector81[2]+70)*1000),'u':int(0),'v':int(90000),'w':int(135000)})
@@ -3809,9 +3809,9 @@ def SCARAMain():
                     poss.append({'x':int(vector72[0]*1000),'y':int((vector72[1]-3)*1000),'z':int((vector72[2]+70)*1000),'u':int(euler71['u']*1000),'v':int(euler71['v']*1000),'w':int(euler71['w']*1000)})   
                     print("抓箱子推动动作")
                     config.log.logger.info("抓箱子推动动作")
-                    poss.append({'x':int(vector76[0]*1000),'y':int(vector76[1]*1000),'z':int((1000)*1000),'u':int(0),'v':int(90000),'w':int(135000)})
+                    poss.append({'x':int(vector76[0]*1000),'y':int(vector76[1]*1000),'z':int((1100)*1000),'u':int(0),'v':int(90000),'w':int(135000)})
                     poss.append({'x':int(vector76[0]*1000),'y':int(vector76[1]*1000),'z':int((910)*1000),'u':int(0),'v':int(90000),'w':int(135000)})
-                    poss.append({'x':int(vector81[0]*1000),'y':int(vector81[1]*1000),'z':int((910)*1000),'u':int(0),'v':int(90000),'w':int(135000)})
+                    poss.append({'x':int(vector81[0]*1000),'y':int(vector81[1]*1000),'z':int((420)*1000),'u':int(0),'v':int(90000),'w':int(135000)})
                     poss.append({'x':int(vector81[0]*1000),'y':int(vector81[1]*1000),'z':int((vector81[2]+20)*1000),'u':int(0),'v':int(90000),'w':int(135000)})
                     # vector81 = np.array([-1308,690,310])
                     vector81 = np.array([-1308,720,310])
@@ -3829,10 +3829,14 @@ def SCARAMain():
 
                 
                 startPos = {'x':vector72[0],'y':vector72[1],'z': hight,'u':0,'v':90,'w':-45}
-                if carton0 >= 4:
-                    EndPos = {'x':vector81[0],'y':vector81[1],'z': hight,'u':0,'v':90,'w':135} 
+                # if carton0 >= 4:
+                #     EndPos = {'x':vector81[0],'y':vector81[1],'z': hight,'u':0,'v':90,'w':135} 
+                # else:
+                #     EndPos = {'x':vector81[0],'y':vector81[1],'z': hight,'u':0,'v':90,'w':135}   
+                if carton0 < 4:
+                    EndPos = {'x':vector76[0],'y':vector76[1],'z': hight,'u':0,'v':90,'w':135} 
                 else:
-                    EndPos = {'x':vector81[0],'y':vector81[1],'z': hight,'u':0,'v':90,'w':135}               
+                    EndPos = {'x':vector76[0],'y':vector76[1],'z': hight,'u':0,'v':90,'w':135}  
                 trans,poss_arm = route_planning(startPos,EndPos,hight)
                 if trans == False:
                     config.action = 1001
@@ -3945,7 +3949,7 @@ def SCARAMain():
                     vectorStart = np.array([config.currentPos['x'],config.currentPos['y'],config.currentPos['z']])
                     eulerStart = { 'u':config.currentPos['u'], 'v':config.currentPos['v'], 'w':config.currentPos['w'] }
                     config.database.insert(str(current_time),0,vectorStart[0],vectorStart[1],vectorStart[2],eulerStart['u'],eulerStart['v'],eulerStart['w'])
-                    hight = 1000
+                    hight = 1100
                     startPos = copy.deepcopy(config.currentPos)
                     # EndPos = {'x':583,'y':1101,'z':hight,'u':0,'v':90,'w':0}    
                     EndPos = {'x':583,'y':1101,'z':hight,'u':0,'v':90,'w':0}             
